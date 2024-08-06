@@ -1,7 +1,110 @@
 #include <gtk/gtk.h>
+#include <stdlib.h>
 
-//This function executes when the gtk app object is activated
-static void activate(GtkApplication *app, gpointer uder_data) {
+#include "header/nonmodular.h"
+#include "header/gtkmodule.h"
+
+void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
+	double xc = 0.0;
+	double yc = 300.0;
+	
+	cairo_set_line_width(cr, 1.5);
+	cairo_set_source_rgba(cr, 107.0, 221.0, 0.0, 1.0);
+
+	//Horizontal axis
+	cairo_move_to(cr, xc, yc);
+	cairo_line_to(cr, (double)width, yc);
+	
+	cairo_stroke_preserve(cr);
+
+	//Vertical axis
+	cairo_move_to(cr, 1.5, 0.0);
+	cairo_line_to(cr, xc, (double)height);
+
+	cairo_stroke(cr);
+	
+	//Waves around x axis
+	cairo_set_line_width(cr, 1.0);
+	cairo_set_source_rgba(cr, 255.0, 0.0, 0.0, 1.0);
+
+	xc = 2.5;
+	cairo_move_to(cr, xc, yc);
+	
+	double invert = -1.0;
+	for (int i=0; i<300; i++) {
+		cairo_line_to(cr, xc, yc + (invert*-50.0));
+		
+		xc += 10.0;
+		cairo_line_to(cr, xc, yc + (invert*-50.0));
+		
+		invert = invert*(-1.0);	
+	}
+
+	cairo_stroke(cr);
+}
+
+//Send button callback that generates a wave graph
+void generateGraph(GraphInfo graph_info) {
+	GtkWidget *graph_window = gtk_window_new();
+	GtkWidget *drawing_area = gtk_drawing_area_new();
+	GtkWidget *scrolled_window = gtk_scrolled_window_new();
+	GtkAdjustment *scroll_adjustment;
+
+	//Scrolled window configuration
+	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), drawing_area);
+	gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), 10000); 
+	
+
+	//Window configuration
+	gtk_window_set_default_size(GTK_WINDOW(graph_window), 900, 600);
+	gtk_window_set_child(GTK_WINDOW(graph_window), scrolled_window);
+	gtk_window_present(GTK_WINDOW(graph_window));
+
+	//Drawing area configuration
+	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_graph, NULL, NULL);
+}
+
+gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
+	InfoWidgets *data = (InfoWidgets*) user_data;
+	GtkWidget *text = (GtkWidget*) data->text_field;
+	GtkWidget **check_array = (GtkWidget**) data->check_button;
+	GtkWidget *band_spin = (GtkWidget*) data->band_spin_button;
+	GtkWidget *noise_spin = (GtkWidget*) data->noise_spin_button;
+
+	int d_value = 0;
+	int c_value = 0;
+
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text));	
+	GtkTextIter start_iter;
+	GtkTextIter end_iter;
+	
+	gtk_text_buffer_get_bounds(buffer, &start_iter, &end_iter);
+	
+	for (int i=0; i<9; i++) {
+		if (i<6) {
+			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
+				d_value = i;
+			}
+		}else{
+			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
+				c_value = i;
+			}
+		}
+	}
+	
+	GraphInfo graph_info = {
+		gtk_text_buffer_get_text(buffer, &start_iter, &end_iter, FALSE),
+		gtk_spin_button_get_value(GTK_SPIN_BUTTON(noise_spin)),
+		gtk_spin_button_get_value(GTK_SPIN_BUTTON(band_spin)),
+		d_value,
+		c_value
+	};
+	
+	generateGraph(graph_info);
+}
+
+//This function executes when the gtk app object emits an 'activate' signal
+void activate(GtkApplication *app, gpointer user_data) {
 	//Declaring window
 	GtkWidget *main_window;
 
@@ -18,6 +121,7 @@ static void activate(GtkApplication *app, gpointer uder_data) {
 	//Declaring buttons
 	GtkAdjustment *noise_spin_button_adjustment;
 	GtkWidget *noise_spin_button;
+	GtkWidget *band_spin_button;
 	GtkWidget *send_button;
 	GtkWidget *check_box[9];
 
@@ -25,6 +129,7 @@ static void activate(GtkApplication *app, gpointer uder_data) {
 	GtkWidget *text_field_label;
 	GtkWidget *spin_button_label_horizontal;
 	GtkWidget *spin_button_label_vertical;
+	GtkWidget *band_spin_button_label;
 
 	//Declaring check box row's label
 	GtkWidget *check_box_digital_label;
@@ -47,13 +152,15 @@ static void activate(GtkApplication *app, gpointer uder_data) {
 	text_field = gtk_text_view_new();
 	text_field_label = gtk_label_new("Type a message");
 	
-	noise_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000.0, 1.0, 0.1, 0.0);
+	noise_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0);
 	noise_spin_button = gtk_spin_button_new(noise_spin_button_adjustment, 10.0, 3);
+	band_spin_button = gtk_spin_button_new(noise_spin_button_adjustment, 10.0, 3);
 	
 	send_button = gtk_button_new_with_label("Send message");
 	
 	spin_button_label_horizontal = gtk_label_new("Watt");
-	spin_button_label_vertical = gtk_label_new("Define the channel's noise power");
+	band_spin_button_label = gtk_label_new("Hz");
+	spin_button_label_vertical = gtk_label_new("Define the channel's noise power and the bandwidth's frequency");
 	
 	check_box_digital_label = gtk_label_new("Choose one type of digital modulation");
 	check_box_carrier_label = gtk_label_new("Choose one type of carrier modulation");
@@ -104,6 +211,8 @@ static void activate(GtkApplication *app, gpointer uder_data) {
 
 	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), noise_spin_button);
 	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), spin_button_label_horizontal);
+	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), band_spin_button);
+	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), band_spin_button_label);
 
 	gtk_box_append(GTK_BOX(main_vertical_container), text_field_label);
 	gtk_box_append(GTK_BOX(main_vertical_container), text_field);
@@ -114,6 +223,30 @@ static void activate(GtkApplication *app, gpointer uder_data) {
 	gtk_box_append(GTK_BOX(main_vertical_container), check_box_carrier_label);
 	gtk_box_append(GTK_BOX(main_vertical_container), main_check_box_carrier_container);
 	gtk_box_append(GTK_BOX(main_vertical_container), send_button);
+	
+	//Setting check button's group
+	for (int i=0; i<9; i++) {
+		if (i<6 && i!=0) {
+			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[0]));
+		}else if (i>6) {
+			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[6]));
+		}
+	}
+
+	//Binding the callback functions to the widgets	
+	
+	InfoWidgets *data = g_new0(InfoWidgets, 1);
+	
+	data->text_field = text_field;
+
+	for (int i=0; i<9; i++) {
+		data->check_button[i] = check_box[i];
+	}
+
+	data->noise_spin_button = noise_spin_button;
+	data->band_spin_button = band_spin_button;
+
+	g_signal_connect(send_button, "clicked", G_CALLBACK(sendButtonClick), data); 	
 
 	//Setting window's configuration
 	gtk_window_set_title(GTK_WINDOW(main_window), "Telecom simulation");
