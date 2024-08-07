@@ -1,10 +1,16 @@
 #include <gtk/gtk.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #include "header/nonmodular.h"
 #include "header/gtkmodule.h"
 
+static int coord_arr_size;
+
 void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
+	NRZCoordinate *data_to_draw = (NRZCoordinate*) user_data;
+	
 	double xc = 0.0;
 	double yc = 300.0;
 	
@@ -29,22 +35,73 @@ void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height
 
 	xc = 2.5;
 	cairo_move_to(cr, xc, yc);
-	
-	double invert = -1.0;
-	for (int i=0; i<300; i++) {
-		cairo_line_to(cr, xc, yc + (invert*-50.0));
+	for (int i=0; i<coord_arr_size; i++) {
+		cairo_line_to(cr, xc, data_to_draw[i].voltage);
 		
 		xc += 10.0;
-		cairo_line_to(cr, xc, yc + (invert*-50.0));
-		
-		invert = invert*(-1.0);	
+		cairo_line_to(cr, xc, data_to_draw[i].voltage);	
 	}
 
 	cairo_stroke(cr);
+	free(data_to_draw);
 }
 
 //Send button callback that generates a wave graph
-void generateGraph(GraphInfo graph_info) {
+void generateGraph(GraphInfo graph_info) { 		
+	NRZCoordinate *coordinates;
+	coord_arr_size = 0;
+
+	switch (graph_info.digital_mod_type) {
+		case 0:
+			coordinates = generateNrzPolarLSignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*8;
+			break;	
+		case 1:
+			coordinates = generateNrzPolarISignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*8;
+			break;	
+		case 2:
+			coordinates = generateNrzManchesterSignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*16;
+			break;	
+		case 3:
+			coordinates = generateNrzDifferencialManchesterSignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*16;
+			break;	
+		case 4:
+			coordinates = generateNrzBipolarAMISignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*8;
+			break;	
+		case 5:
+			coordinates = generateNrzBipolarPseudoternarySignal(graph_info.message_str, 
+							strlen(graph_info.message_str),
+							graph_info.bandwidth,
+							300.0,
+							true);
+			coord_arr_size = strlen(graph_info.message_str)*8;
+			break;	
+	}
+	
 	GtkWidget *graph_window = gtk_window_new();
 	GtkWidget *drawing_area = gtk_drawing_area_new();
 	GtkWidget *scrolled_window = gtk_scrolled_window_new();
@@ -56,12 +113,13 @@ void generateGraph(GraphInfo graph_info) {
 	
 
 	//Window configuration
+	gtk_window_set_title(GTK_WINDOW(graph_window), "Modulated signal");
 	gtk_window_set_default_size(GTK_WINDOW(graph_window), 900, 600);
 	gtk_window_set_child(GTK_WINDOW(graph_window), scrolled_window);
 	gtk_window_present(GTK_WINDOW(graph_window));
 
 	//Drawing area configuration
-	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_graph, NULL, NULL);
+	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_graph, coordinates, NULL);
 }
 
 gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
@@ -120,6 +178,7 @@ void activate(GtkApplication *app, gpointer user_data) {
 	
 	//Declaring buttons
 	GtkAdjustment *noise_spin_button_adjustment;
+	GtkAdjustment *band_spin_button_adjustment;
 	GtkWidget *noise_spin_button;
 	GtkWidget *band_spin_button;
 	GtkWidget *send_button;
@@ -153,8 +212,9 @@ void activate(GtkApplication *app, gpointer user_data) {
 	text_field_label = gtk_label_new("Type a message");
 	
 	noise_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0);
+	band_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0); 
 	noise_spin_button = gtk_spin_button_new(noise_spin_button_adjustment, 10.0, 3);
-	band_spin_button = gtk_spin_button_new(noise_spin_button_adjustment, 10.0, 3);
+	band_spin_button = gtk_spin_button_new(band_spin_button_adjustment, 10.0, 3);
 	
 	send_button = gtk_button_new_with_label("Send message");
 	
