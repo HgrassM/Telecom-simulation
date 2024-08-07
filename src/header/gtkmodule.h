@@ -1,5 +1,12 @@
+#include "nonmodular.h"
+
 #ifndef GTK_MODULE_H
 #define GTK_MODULE_H
+
+typedef struct {
+	NRZCoordinate coordinates[16];
+	int coord_arr_size;
+}PointsData;
 
 typedef struct {
 	GtkWidget *text_field;
