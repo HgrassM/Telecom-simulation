@@ -5,7 +5,7 @@ unsigned char* convertToBitStream(unsigned char message[], int message_size) {
 
 	for (int i=0; i<message_size; i++) {	
 		for (int j=0; j<8; j++) {
-			message_in_bits[(i*8)+j] = (message[i] >> j & 1) != 0; 
+			message_in_bits[((i*8)+7)-j] = (message[i] >> j & 1) != 0; 
 		}
 	}
 
