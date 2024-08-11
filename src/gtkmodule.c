@@ -5,10 +5,54 @@
 
 #include "header/nonmodular.h"
 #include "header/gtkmodule.h"
+#include "header/carriermodule.h"
 
-static int coord_arr_size;
+static int digital_coord_arr_size;
 
-void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
+void draw_graph_carrier(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
+	SinCoordinate *data_to_draw = (SinCoordinate*) user_data;
+	
+	double xc = 0.0;
+	double yc = 300.0;
+	
+	cairo_set_line_width(cr, 1.5);
+	cairo_set_source_rgba(cr, 107.0, 221.0, 0.0, 1.0);
+
+	//Horizontal axis
+	cairo_move_to(cr, xc, yc);
+	cairo_line_to(cr, (double)width, yc);
+	
+	cairo_stroke_preserve(cr);
+
+	//Vertical axis
+	cairo_move_to(cr, 1.5, 0.0);
+	cairo_line_to(cr, xc, (double)height);
+
+	cairo_stroke(cr);
+	
+	//Waves around x axis
+	cairo_set_line_width(cr, 1.0);
+	cairo_set_source_rgba(cr, 255.0, 0.0, 0.0, 1.0);
+
+	xc = 2.5;
+	cairo_move_to(cr, xc, yc);
+
+	int i=0;
+	while (!data_to_draw[i].isLast) {
+		cairo_line_to(cr, xc + data_to_draw[i].time, yc + data_to_draw[i].voltage);
+		
+		cairo_line_to(cr, xc + data_to_draw[i].time, yc + data_to_draw[i].voltage);
+		
+		i += 1;	
+	}
+
+	cairo_stroke(cr);
+	free(data_to_draw);
+}
+
+
+
+void draw_graph_digital(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
 	NRZCoordinate *data_to_draw = (NRZCoordinate*) user_data;
 	
 	double xc = 0.0;
@@ -35,7 +79,7 @@ void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height
 
 	xc = 2.5;
 	cairo_move_to(cr, xc, yc);
-	for (int i=0; i<coord_arr_size; i++) {
+	for (int i=0; i<digital_coord_arr_size; i++) {
 		cairo_line_to(cr, xc, data_to_draw[i].voltage);
 		
 		xc += 10.0;
@@ -48,78 +92,129 @@ void draw_graph(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height
 
 //Send button callback that generates a wave graph
 void generateGraph(GraphInfo graph_info) { 		
-	NRZCoordinate *coordinates;
-	coord_arr_size = 0;
+	NRZCoordinate *digital_coordinates;
+	digital_coord_arr_size = 0;
+
+	SinCoordinate *carrier_coordinates;
 
 	switch (graph_info.digital_mod_type) {
 		case 0:
-			coordinates = generateNrzPolarLSignal(graph_info.message_str, 
+			digital_coordinates = generateNrzPolarLSignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*8;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*8;
 			break;	
 		case 1:
-			coordinates = generateNrzPolarISignal(graph_info.message_str, 
+			digital_coordinates = generateNrzPolarISignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*8;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*8;
 			break;	
 		case 2:
-			coordinates = generateNrzManchesterSignal(graph_info.message_str, 
+			digital_coordinates = generateNrzManchesterSignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*16;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*16;
 			break;	
 		case 3:
-			coordinates = generateNrzDifferencialManchesterSignal(graph_info.message_str, 
+			digital_coordinates = generateNrzDifferencialManchesterSignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*16;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*16;
 			break;	
 		case 4:
-			coordinates = generateNrzBipolarAMISignal(graph_info.message_str, 
+			digital_coordinates = generateNrzBipolarAMISignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*8;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*8;
 			break;	
 		case 5:
-			coordinates = generateNrzBipolarPseudoternarySignal(graph_info.message_str, 
+			digital_coordinates = generateNrzBipolarPseudoternarySignal(graph_info.message_str, 
 							strlen(graph_info.message_str),
 							graph_info.bandwidth,
 							300.0,
-							true);
-			coord_arr_size = strlen(graph_info.message_str)*8;
+							true,
+							graph_info.noise_power);
+			digital_coord_arr_size = strlen(graph_info.message_str)*8;
 			break;	
 	}
+
+	switch (graph_info.carrier_mod_type) {
+		case 0:
+			carrier_coordinates = generateAskModulation(graph_info.message_str,
+							graph_info.bandwidth,
+							strlen(graph_info.message_str));	
+			break;
+		case 1:
+
+			carrier_coordinates = generateFskModulation(graph_info.message_str,
+							graph_info.bandwidth,
+							strlen(graph_info.message_str));
+			break;
+
+		case 2:
+
+			carrier_coordinates = generate8qamModulation(graph_info.message_str,
+							graph_info.bandwidth,
+							strlen(graph_info.message_str));
+			break;
+	}
 	
-	GtkWidget *graph_window = gtk_window_new();
-	GtkWidget *drawing_area = gtk_drawing_area_new();
-	GtkWidget *scrolled_window = gtk_scrolled_window_new();
-	GtkAdjustment *scroll_adjustment;
+	//Digital modulation window definition
+	GtkWidget *digital_graph_window = gtk_window_new();
+	GtkWidget *digital_drawing_area = gtk_drawing_area_new();
+	GtkWidget *digital_scrolled_window = gtk_scrolled_window_new();
+	GtkAdjustment *digital_scroll_adjustment;
 
-	//Scrolled window configuration
-	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), drawing_area);
-	gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), 10000); 
+	//Digital modulation scrolled window configuration
+	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(digital_scrolled_window), digital_drawing_area);
+	gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(digital_drawing_area), 10000); 
 	
 
-	//Window configuration
-	gtk_window_set_title(GTK_WINDOW(graph_window), "Modulated signal");
-	gtk_window_set_default_size(GTK_WINDOW(graph_window), 900, 600);
-	gtk_window_set_child(GTK_WINDOW(graph_window), scrolled_window);
-	gtk_window_present(GTK_WINDOW(graph_window));
+	//Digital modulation window configuration
+	gtk_window_set_title(GTK_WINDOW(digital_graph_window), "Modulated digital signal");
+	gtk_window_set_default_size(GTK_WINDOW(digital_graph_window), 900, 600);
+	gtk_window_set_child(GTK_WINDOW(digital_graph_window), digital_scrolled_window);
+	gtk_window_present(GTK_WINDOW(digital_graph_window));
 
-	//Drawing area configuration
-	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_graph, coordinates, NULL);
+	//Digital modulation drawing area configuration
+	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(digital_drawing_area), draw_graph_digital, digital_coordinates, NULL);
+
+	//Carrier modulation window definition
+	GtkWidget *carrier_graph_window = gtk_window_new();
+	GtkWidget *carrier_drawing_area = gtk_drawing_area_new();
+	GtkWidget *carrier_scrolled_window = gtk_scrolled_window_new();
+	GtkAdjustment *carrier_scroll_adjustment;
+
+	//Carrier modulation scrolled window configuration
+	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(carrier_scrolled_window), carrier_drawing_area);
+	gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(carrier_drawing_area), 10000); 
+	
+
+	//Carrier modulation window configuration
+	gtk_window_set_title(GTK_WINDOW(carrier_graph_window), "Modulated carrier signal");
+	gtk_window_set_default_size(GTK_WINDOW(carrier_graph_window), 900, 600);
+	gtk_window_set_child(GTK_WINDOW(carrier_graph_window), carrier_scrolled_window);
+	gtk_window_present(GTK_WINDOW(carrier_graph_window));
+
+	//Carrier modulation drawing area configuration
+	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(carrier_drawing_area), draw_graph_carrier, carrier_coordinates, NULL);
+
 }
 
 gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
@@ -145,7 +240,7 @@ gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
 			}
 		}else{
 			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
-				c_value = i;
+				c_value = i-6;
 			}
 		}
 	}
@@ -295,8 +390,8 @@ void activate(GtkApplication *app, gpointer user_data) {
 
 	//Binding the callback functions to the widgets	
 	
-	InfoWidgets *data = g_new0(InfoWidgets, 1);
-	
+	InfoWidgets *data = (InfoWidgets*) malloc(sizeof(InfoWidgets));
+
 	data->text_field = text_field;
 
 	for (int i=0; i<9; i++) {
