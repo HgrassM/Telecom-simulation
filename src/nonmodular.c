@@ -5,7 +5,7 @@
 #include "header/bytesmodule.h"
 #include "header/nonmodular.h"
 
-NRZCoordinate* generateNrzPolarLSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzPolarLSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -18,13 +18,11 @@ NRZCoordinate* generateNrzPolarLSignal(unsigned char message[], int message_size
 		double signal_power = 0.0;
 		
 		//Calculating normalized power for NRZ polar
-		signal_power += pow(axis_voltage + 12.0, 2.0);
-		signal_power += pow(axis_voltage - 12.0, 2.0);	
+		signal_power += pow(40.0 + 12.0, 2.0);
+		signal_power += pow(40.0 - 12.0, 2.0);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the channel capacity for a channel with noise (Shannon capacity)
 		bps_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
@@ -49,7 +47,7 @@ NRZCoordinate* generateNrzPolarLSignal(unsigned char message[], int message_size
 	return coordinates;
 }
 
-NRZCoordinate* generateNrzPolarISignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzPolarISignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -62,13 +60,11 @@ NRZCoordinate* generateNrzPolarISignal(unsigned char message[], int message_size
 		double signal_power = 0.0;
 		
 		//Calculating normalized power for NRZ polar
-		signal_power += pow(axis_voltage + 12.0, 2.0);
-		signal_power += pow(axis_voltage - 12.0, 2.0);	
+		signal_power += pow(40.0 + 12.0, 2.0);
+		signal_power += pow(40.0 - 12.0, 2.0);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the channel capacity for a channel with noise (Shannon capacity)
 		bps_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
@@ -99,7 +95,7 @@ NRZCoordinate* generateNrzPolarISignal(unsigned char message[], int message_size
 	return coordinates;
 }
 
-NRZCoordinate* generateNrzManchesterSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzManchesterSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -112,13 +108,11 @@ NRZCoordinate* generateNrzManchesterSignal(unsigned char message[], int message_
 		double signal_power = 0.0;
 
 		//Calculating normalized power for pulses
-		signal_power += pow(axis_voltage + 12.0, 2);
-		signal_power += pow(axis_voltage - 12.0, 2);	
+		signal_power += pow(40.0 + 12.0, 2);
+		signal_power += pow(40.0 - 12.0, 2);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the signal oscilation for a channel with noise (Shannon capacity)
 		signal_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
@@ -151,7 +145,7 @@ NRZCoordinate* generateNrzManchesterSignal(unsigned char message[], int message_
 
 }
 
-NRZCoordinate* generateNrzDifferencialManchesterSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzDifferencialManchesterSignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -164,13 +158,11 @@ NRZCoordinate* generateNrzDifferencialManchesterSignal(unsigned char message[], 
 		double signal_power = 0.0;
 
 		//Calculating normalized power for pulses
-		signal_power += pow(axis_voltage + 12.0, 2);
-		signal_power += pow(axis_voltage - 12.0, 2);	
+		signal_power += pow(40.0 + 12.0, 2);
+		signal_power += pow(40.0 - 12.0, 2);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the signal oscilation for a channel with noise (Shannon capacity)
 		signal_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
@@ -203,7 +195,7 @@ NRZCoordinate* generateNrzDifferencialManchesterSignal(unsigned char message[], 
 
 }
 
-NRZCoordinate* generateNrzBipolarAMISignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzBipolarAMISignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -216,13 +208,11 @@ NRZCoordinate* generateNrzBipolarAMISignal(unsigned char message[], int message_
 		double signal_power = 0.0;
 		
 		//Calculating normalized power for NRZ bipolar
-		signal_power += pow(axis_voltage + 12.0, 2);
-		signal_power += pow(axis_voltage - 12.0, 2);	
+		signal_power += pow(40.0 + 12.0, 2);
+		signal_power += pow(40.0 - 12.0, 2);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the channel capacity for a channel with noisei (Shannon capacity)
 		bps_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
@@ -249,7 +239,7 @@ NRZCoordinate* generateNrzBipolarAMISignal(unsigned char message[], int message_
 	return coordinates;
 }
 
-NRZCoordinate* generateNrzBipolarPseudoternarySignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status) {
+NRZCoordinate* generateNrzBipolarPseudoternarySignal(unsigned char message[], int message_size, double bandwidth, double axis_voltage, bool noise_status, double noise_power) {
 	
 	//Converts the message byte array to bit array and sets NRZ parameters
 	unsigned char* message_bits = convertToBitStream(message, message_size);
@@ -262,13 +252,11 @@ NRZCoordinate* generateNrzBipolarPseudoternarySignal(unsigned char message[], in
 		double signal_power = 0.0;
 		
 		//Calculating normalized power for NRZ bipolar
-		signal_power += pow(axis_voltage + 12.0, 2);
-		signal_power += pow(axis_voltage - 12.0, 2);	
+		signal_power += pow(40.0 + 12.0, 2);
+		signal_power += pow(40.0 - 12.0, 2);	
 
 		signal_power = (1.0/2.0)*signal_power;
 
-		//Defining the noise's power as half the signal's pontecy
-		double noise_power = signal_power/2.0;
 		//Calculating the channel capacity for a channel with noisei (Shannon capacity)
 		bps_rate = bandwidth*log2(1.0+(signal_power/noise_power));
 	}else{
