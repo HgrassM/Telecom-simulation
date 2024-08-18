@@ -28,6 +28,7 @@ unsigned char* convertToByteStream(unsigned char* message_bits, int message_bits
 	int byte_index = 0;
 
 	for (int i=0; i<message_bits_size; i++) {
+		//Invert bit order per byte to maintain the correct order
 		if (i % 8 == 0 && i != 0) {
 			message_bytes[byte_index] = (message_bytes[byte_index] & 0xF0) >> 4 | (message_bytes[byte_index] & 0x0F) << 4;
 			message_bytes[byte_index] = (message_bytes[byte_index] & 0xCC) >> 2 | (message_bytes[byte_index] & 0x33) << 2;
@@ -36,6 +37,7 @@ unsigned char* convertToByteStream(unsigned char* message_bits, int message_bits
 		}
 		
 		if (message_bits[i]) {
+			//Logical shift to "insert" the bits into the byte
 			message_bytes[byte_index] |= 1 << (i%8);
 		}	
 	}
@@ -67,4 +69,177 @@ void generateError(unsigned char* message_bits, int message_bits_size, int error
 		}
 
 	}
+}
+
+unsigned char* frameByCharacterCounting(unsigned char* raw_message, int raw_message_size) {
+	unsigned char *frames;
+	int extra_byte = 0;
+	//Generate a single frame for a message smaller than 8 bytes
+	if (raw_message_size < 8) {
+		frames = (unsigned char*) malloc(raw_message_size + 1);
+
+		frames[0] = raw_message_size + 1;
+
+		for (int i=0; i<raw_message_size; i++) {
+			frames[i+1] = raw_message[i];
+		}
+	//Generates mutiple frames if the message size is bigger than 8
+	}else {
+		frames = (unsigned char*) malloc(raw_message_size);
+		
+		int i=0;
+		int iter = 0;
+
+		while(iter < raw_message_size) {
+			//Puts character count char for a 7 bytes frame
+			if (i%8 == 0 && raw_message_size - iter > 8) {
+				extra_byte += 1;
+				frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+				
+				frames[i] = 8;
+				i += 1;
+				
+				for (int k=0; k < 7; k++) {
+					frames[i] = raw_message[iter];
+					i += 1;
+					iter += 1;
+				}
+			//Puts character count char for a less than 7 bytes frame size
+			}else{
+				extra_byte += 1;
+				frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+
+				frames[i] = (raw_message_size - iter) + 1;
+				i += 1;
+
+				while(iter < raw_message_size) {
+					frames[i] = raw_message[iter];
+					i += 1;
+					iter += 1;
+				}
+			}
+		}
+	}
+
+	return frames;	
+}
+
+unsigned char* frameByBytesFlag(unsigned char* raw_message, int raw_message_size) {
+	unsigned char flag_char = 126;
+	unsigned char esc_char = 124;
+	unsigned char *frames = (unsigned char*) malloc(raw_message_size);
+	
+	int frames_index = 0;
+	int extra_byte = 0;
+
+	for (int iter = 0; iter<raw_message_size; iter++) {
+		//Puts a flag to sinalyze the start of a frame
+		if (iter == 0) {
+			extra_byte += 1;
+			frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+
+			frames[frames_index] = flag_char;
+			frames_index += 1;
+		//Puts a flag to sinalyze the end of a frame and a flag to sinalyze the start of the next frame 
+		}else if (iter % 8 == 0) {
+			extra_byte += 2;
+			frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+			
+			frames[frames_index] = flag_char;
+			frames_index += 1;
+			frames[frames_index] = flag_char;
+			frames_index += 1;
+		}
+		
+		//Puts an escape byte to sinalyze that the next byte is not a flag, although it is equal to the flag
+		if (raw_message[iter] == flag_char) {
+			extra_byte += 1;
+			frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+
+			frames[frames_index] = esc_char;
+			frames_index += 1;
+		}
+		
+		//Puts the message data on the frame
+		frames[frames_index] = raw_message[iter];
+		frames_index += 1;
+	}
+	
+	extra_byte += 1;
+	frames = (unsigned char*) realloc(frames, raw_message_size + extra_byte);
+
+	frames[frames_index] = flag_char;	
+
+	return frames;
+}
+
+unsigned char* frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_bits_size) {
+	unsigned char *frames = (unsigned char*) malloc(raw_message_bits_size);
+	
+	int frames_index = 0;
+	int message_index = 0;
+	int extra_bits = 0;
+	int flag_one_count = 0;
+	
+	while (message_index < raw_message_bits_size) {
+		//Puts a flag to sinalyze the start of the frame
+		if (message_index == 0) {
+			extra_bits += 8;
+			frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
+			
+			frames[frames_index] = 0;
+			frames_index += 1;
+
+			for (int i=0; i<6; i++) {
+				frames[frames_index] = 1;
+				frames_index += 1;
+			}
+
+			frames[frames_index] = 0;
+			frames_index += 1;
+
+		//Puts a flag to sinalyze the end of a frame and puts a flag to sinalyze the start of the next frame
+		}else if (message_index % 64 == 0) {
+			extra_bits += 16;
+			frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
+			
+			for (int k=0; k<2; k++) {
+				frames[frames_index] = 0;
+				frames_index += 1;
+
+				for (int i=0; i<6; i++) {
+					frames[frames_index] = 1;
+					frames_index += 1;
+				}
+
+				frames[frames_index] = 0;
+				frames_index += 1;
+			}
+		//Puts the message data on the frame
+		}else{
+			for (int i=0; i<64; i++) {
+				if (flag_one_count >= 5) {
+					extra_bits += 1;
+					frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
+					
+					frames[frames_index] = 0;
+					frames_index += 1;
+				}
+
+				if (raw_message_bits[message_index]) {
+					flag_one_count += 1;
+				}else{
+					flag_one_count = 0;
+				}
+
+				frames[frames_index] = raw_message_bits[message_index];
+				message_index += 1;
+				frames_index += 1;
+			}
+		}
+
+		message_index += 1;
+	}
+
+	return frames;
 }
