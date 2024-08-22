@@ -13,4 +13,8 @@ unsigned char* frameByBytesFlag(unsigned char* raw_message, int raw_message_size
 
 unsigned char* frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_bits_size);
 
+unsigned char* createErrorCheckBitParity(unsigned char* received_data_bits, int received_data_bits_length);
+
+unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int received_data_bits_length);
+
 #endif
