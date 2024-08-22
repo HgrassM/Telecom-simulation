@@ -215,31 +215,102 @@ unsigned char* frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_
 				frames[frames_index] = 0;
 				frames_index += 1;
 			}
+		}
+
 		//Puts the message data on the frame
-		}else{
-			for (int i=0; i<64; i++) {
-				if (flag_one_count >= 5) {
-					extra_bits += 1;
-					frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
-					
-					frames[frames_index] = 0;
+		for (int i=0; i<64; i++) {
+			if (message_index >= raw_message_bits_size) {
+				extra_bits += 8;
+				frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
+			
+				frames[frames_index] = 0;
+				frames_index += 1;
+
+				for (int i=0; i<6; i++) {
+					frames[frames_index] = 1;
 					frames_index += 1;
 				}
 
-				if (raw_message_bits[message_index]) {
-					flag_one_count += 1;
-				}else{
-					flag_one_count = 0;
-				}
-
-				frames[frames_index] = raw_message_bits[message_index];
-				message_index += 1;
+				frames[frames_index] = 0;
 				frames_index += 1;
+	
+				break;
 			}
-		}
+				
+			if (flag_one_count >= 5) {
+				extra_bits += 1;
+				frames = (unsigned char*) realloc(frames, raw_message_bits_size + extra_bits);
+					
+				frames[frames_index] = 0;
+				frames_index += 1;
 
-		message_index += 1;
+				flag_one_count = 0;
+			}
+
+			if (raw_message_bits[message_index]) {
+				flag_one_count += 1;
+			}else{
+				flag_one_count = 0;
+			}
+
+			frames[frames_index] = raw_message_bits[message_index];
+			message_index += 1;
+			frames_index += 1;	
+		}
 	}
 
 	return frames;
+}
+
+unsigned char* createErrorCheckBitParity(unsigned char* received_data_bits, int received_data_bits_length) {
+	unsigned char *message_with_parity_bit = (unsigned char*) malloc(received_data_bits_length + 1);
+	int one_count = 0;
+
+	for (int i=0; i<received_data_bits_length; i++) {
+		if (received_data_bits[i]) {
+			one_count += 1;
+		}
+
+		message_with_parity_bit[i] = received_data_bits[i];
+	}
+
+	if (one_count % 2 != 0) {
+		message_with_parity_bit[received_data_bits_length] = 1;
+	}else{
+		message_with_parity_bit[received_data_bits_length] = 0;	
+	}
+
+	return message_with_parity_bit;
+}
+
+unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int received_data_bits_length) {
+	unsigned char crc_word[] = {1,1,1,0,1,1,0,1,1,0,1,1,1,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0};
+	unsigned char *result_word = (unsigned char*) malloc(received_data_bits_length + 31);
+
+	//Copying the message
+	for (int i=0; i<received_data_bits_length; i++) {
+		result_word[i] = received_data_bits[i];
+	}
+	
+	//Adding 31 zeroes to the copied message
+	for (int i=0; i<31; i++) {
+		result_word[received_data_bits_length + i] = 0;
+	}
+
+	//CRC division algorithm
+	for (int i=0; i<received_data_bits_length + 31; i += 32) {
+		
+		int crc_word_index = 0;
+		for (int k=i; k<i+32; k++) {
+			result_word[k] = crc_word[crc_word_index] ^ result_word[k];
+			crc_word_index += 1;
+		}	
+	}
+	
+	//Storing message with key
+	for (int i=0; i<received_data_bits_length; i++) {
+		result_word[i] = received_data_bits[i];
+	}
+
+	return result_word;
 }
