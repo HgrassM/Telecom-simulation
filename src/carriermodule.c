@@ -17,7 +17,7 @@ SinCoordinate* generateAskModulation(unsigned char message[], double bandwidth, 
 	SinCoordinate *new_coordinates = (SinCoordinate*) malloc(sizeof(SinCoordinate));
 
 	for (int i=0; i<message_size*8; i++) {
-		for (double j=start; j<start+10.0; j += 0.1) {
+		for (double j=start; j<start+40.0; j += 0.1) {
 			if (message_bits[i]) {
 				new_coordinates[count].voltage = amplitude*sin(2.0*3.14*bandwidth*j);
 				new_coordinates[count].time = j;
@@ -33,7 +33,7 @@ SinCoordinate* generateAskModulation(unsigned char message[], double bandwidth, 
 			count += 1;	
 		}
 
-		start += 10.0;
+		start += 40.0;
 	}
 
 	new_coordinates[count].voltage = -1.0;
@@ -54,7 +54,7 @@ SinCoordinate* generateFskModulation(unsigned char message[], double bandwidth, 
 	SinCoordinate *new_coordinates = (SinCoordinate*) malloc(sizeof(SinCoordinate));
 
 	for (int i=0; i<message_size*8; i++) {
-		for (double j=start; j<start+10.0; j+=0.1) {
+		for (double j=start; j<start+40.0; j+=0.1) {
 			if (message_bits[i]) {
 				new_coordinates[count].voltage = amplitude*sin(2.0*3.14*bandwidth*j);
 				new_coordinates[count].time = j;
@@ -69,7 +69,7 @@ SinCoordinate* generateFskModulation(unsigned char message[], double bandwidth, 
 			count += 1;	
 		}
 
-		start += 10.0;
+		start += 40.0;
 	}
 	
 	new_coordinates[count].voltage = -1.0;
@@ -115,7 +115,7 @@ SinCoordinate* generate8qamModulation(unsigned char message[], double bandwidth,
 			sprintf(str, "%d%d%d", bits[0], bits[1], bits[2]);
 		}
 		
-		for (double j=start; j<start+30.0; j+=0.1) {
+		for (double j=start; j<start+120.0; j+=0.1) {
 			
 			char *str2 = (char*) malloc(4);
 			str2[0] = '0';
@@ -182,7 +182,7 @@ SinCoordinate* generate8qamModulation(unsigned char message[], double bandwidth,
 		new_coordinates[count].time = -1.0;
 		new_coordinates[count].isLast = true;
 		
-		start += 30.0;
+		start += 120.0;
 
 		free(str);
 	}
