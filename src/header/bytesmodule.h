@@ -17,4 +17,16 @@ unsigned char* createErrorCheckBitParity(unsigned char* received_data_bits, int 
 
 unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int received_data_bits_length);
 
+unsigned char* generateHammingErrorCorrection(unsigned char* received_data_bits, int received_data_bits_length);
+
+unsigned char* getMessageFromByteFrame(unsigned char* received_message, int message_length);
+
+unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int message_length);
+
+unsigned char* verifyErrorByParity(unsigned char* received_message_bits, int message_length);
+
+unsigned char* verifyErrorByCrc(unsigned char* received_message_bits, int message_length);
+
+unsigned char* verifyErrorByHamming(unsigned char* received_message_bits, int message_size);
+
 #endif
