@@ -7,7 +7,9 @@
 #include "header/gtkmodule.h"
 #include "header/carriermodule.h"
 
-static int digital_coord_arr_size;
+static int digital_coord_arr_size = 0;
+double *nrz_time = NULL;
+bool isManchester = false;
 
 void draw_graph_carrier(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
 	SinCoordinate *data_to_draw = (SinCoordinate*) user_data;
@@ -47,9 +49,96 @@ void draw_graph_carrier(GtkDrawingArea *drawing_area, cairo_t *cr, int width, in
 	}
 
 	cairo_stroke(cr);
-	free(data_to_draw);
-}
 
+	//Draws numbers on the x axis
+	xc = 25.0;
+	yc = 290.0;
+	char number_str[100];
+	cairo_set_font_size(cr, 8.0);
+	cairo_set_source_rgba(cr, 0.0, 160.0, 0.0, 1.0);
+
+	if (!isManchester) {
+		for (int i=0; i<digital_coord_arr_size; i++) {
+			cairo_move_to(cr, xc, yc);
+
+			sprintf(number_str, "%.2fms", nrz_time[i]*1000.0);
+			cairo_show_text(cr, number_str);
+
+			xc += 40;	
+		}
+	}else{
+		for (int i=1; i<digital_coord_arr_size; i+=2) {
+			cairo_move_to(cr, xc, yc);
+
+			sprintf(number_str, "%.2fms", nrz_time[i]*1000.0);
+			cairo_show_text(cr, number_str);
+
+			xc += 40;	
+		}
+	}
+
+	cairo_stroke(cr);
+
+	//Draws numbers on the y axis
+	xc = 12.0;
+	yc = 253.0;
+	int num = 52;
+
+	for (int i=0; i<2; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		sprintf(number_str, "%dV", num);
+		cairo_show_text(cr, number_str);
+		
+		num -= 24;
+		yc += 100;	
+	}
+	
+	//Draws lines to set the numerical values on the x axis
+	xc = 42.5;
+	yc = 295.0;
+	cairo_set_source_rgba(cr, 32.0, 93.0, 255.0, 1.0);
+
+	if (!isManchester) {
+		for (int i=0; i<digital_coord_arr_size; i++) {
+			cairo_move_to(cr, xc, yc);
+
+			cairo_line_to(cr, xc, yc + 10.0);
+
+			xc += 40.0;
+		}
+	}else{
+		for (int i=1; i<digital_coord_arr_size; i+=2) {
+			cairo_move_to(cr, xc, yc);
+
+			cairo_line_to(cr, xc, yc + 10.0);
+
+			xc += 40.0;
+		}
+	}
+
+	cairo_stroke(cr);
+	
+	//Draws lines to set the numerical values on the y axis
+	
+	xc = 0.1;
+	yc = 250.0;
+
+	for (int i=0; i<2; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		cairo_line_to(cr, xc+10.0, yc);
+
+		yc += 100;	
+	}
+
+	cairo_stroke(cr);
+
+	free(nrz_time);
+	free(data_to_draw);
+
+	isManchester = false;
+}
 
 
 void draw_graph_digital(GtkDrawingArea *drawing_area, cairo_t *cr, int width, int height, gpointer user_data) {
@@ -82,11 +171,77 @@ void draw_graph_digital(GtkDrawingArea *drawing_area, cairo_t *cr, int width, in
 	for (int i=0; i<digital_coord_arr_size; i++) {
 		cairo_line_to(cr, xc, data_to_draw[i].voltage);
 		
-		xc += 10.0;
+		xc += 40.0;
 		cairo_line_to(cr, xc, data_to_draw[i].voltage);	
+	}	
+
+	cairo_stroke(cr);
+	
+	//Draws numbers on the x axis
+	xc = 25.0;
+	yc = 290.0;
+	char number_str[100];
+	cairo_set_font_size(cr, 8.0);
+	cairo_set_source_rgba(cr, 0.0, 160.0, 0.0, 1.0);
+
+	for (int i=0; i<digital_coord_arr_size; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		sprintf(number_str, "%.2fms", data_to_draw[i].time*1000.0);
+		cairo_show_text(cr, number_str);
+
+		xc += 40;	
+	}	
+
+	cairo_stroke(cr);
+
+	//Draws numbers on the y axis
+	xc = 12.0;
+	yc = 253.0;
+	int num = 52;
+
+	for (int i=0; i<2; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		sprintf(number_str, "%dV", num);
+		cairo_show_text(cr, number_str);
+		
+		num -= 24;
+		yc += 100;	
 	}
 
 	cairo_stroke(cr);
+	
+	//Draws lines to set the numerical values on the x axis	
+	xc = 42.5;
+	yc = 295.0;
+	cairo_set_source_rgba(cr, 32.0, 93.0, 255.0, 1.0);
+	
+	for (int i=0; i<digital_coord_arr_size; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		cairo_line_to(cr, xc, yc + 10.0);
+
+		xc += 40.0;
+	}
+
+	cairo_stroke(cr);
+
+	//Draws lines to set the numerical values on the y axis
+	
+	xc = 0.1;
+	yc = 250.0;
+
+	for (int i=0; i<2; i++) {
+		cairo_move_to(cr, xc, yc);
+
+		cairo_line_to(cr, xc+10.0, yc);
+
+		yc += 100;	
+	}
+
+	cairo_stroke(cr);
+
 	free(data_to_draw);
 }
 
@@ -124,6 +279,8 @@ void generateGraph(GraphInfo graph_info) {
 							true,
 							graph_info.noise_power);
 			digital_coord_arr_size = strlen(graph_info.message_str)*16;
+
+			isManchester = true;
 			break;	
 		case 3:
 			digital_coordinates = generateNrzDifferencialManchesterSignal(graph_info.message_str, 
@@ -133,6 +290,8 @@ void generateGraph(GraphInfo graph_info) {
 							true,
 							graph_info.noise_power);
 			digital_coord_arr_size = strlen(graph_info.message_str)*16;
+
+			isManchester = true;
 			break;	
 		case 4:
 			digital_coordinates = generateNrzBipolarAMISignal(graph_info.message_str, 
@@ -152,6 +311,12 @@ void generateGraph(GraphInfo graph_info) {
 							graph_info.noise_power);
 			digital_coord_arr_size = strlen(graph_info.message_str)*8;
 			break;	
+	}
+	
+	nrz_time = (double*) malloc(sizeof(double)*digital_coord_arr_size);
+
+	for (int i=0; i<digital_coord_arr_size; i++) {
+		nrz_time[i] = digital_coordinates[i].time;
 	}
 
 	switch (graph_info.carrier_mod_type) {
@@ -223,9 +388,12 @@ gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
 	GtkWidget **check_array = (GtkWidget**) data->check_button;
 	GtkWidget *band_spin = (GtkWidget*) data->band_spin_button;
 	GtkWidget *noise_spin = (GtkWidget*) data->noise_spin_button;
+	GtkWidget *error_spin = (GtkWidget*) data->error_prob_spin_button;
 
 	int d_value = 0;
 	int c_value = 0;
+	int error_value = 0;
+	int frame_value = 0;
 
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text));	
 	GtkTextIter start_iter;
@@ -233,14 +401,22 @@ gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
 	
 	gtk_text_buffer_get_bounds(buffer, &start_iter, &end_iter);
 	
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		if (i<6) {
 			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
 				d_value = i;
 			}
-		}else{
+		}else if (i<9) {
 			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
 				c_value = i-6;
+			}
+		}else if (i<12) {
+			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
+				frame_value = i-9;
+			} 
+		}else{
+			if (gtk_check_button_get_active(GTK_CHECK_BUTTON(check_array[i]))) {
+				error_value = i-12;
 			}
 		}
 	}
@@ -251,6 +427,12 @@ gboolean sendButtonClick(GtkWidget *widget, gpointer user_data) {
 		gtk_spin_button_get_value(GTK_SPIN_BUTTON(band_spin)),
 		d_value,
 		c_value
+	};
+
+	MessageInfo message_info = {
+		gtk_spin_button_get_value(GTK_SPIN_BUTTON(error_spin)),
+		error_value,
+		frame_value
 	};
 	
 	generateGraph(graph_info);
@@ -263,10 +445,12 @@ void activate(GtkApplication *app, gpointer user_data) {
 
 	//Declaring containers
 	GtkWidget *main_vertical_container;
-	GtkWidget *vertical_check_box_container[9];
+	GtkWidget *vertical_check_box_container[15];
 	GtkWidget *main_check_box_digital_container;
 	GtkWidget *main_check_box_carrier_container;
 	GtkWidget *noise_spin_button_horizontal_container;
+	GtkWidget *main_check_box_error_detection_container;
+	GtkWidget *main_check_box_frame_container;
 	
 	//Declaring text field
 	GtkWidget *text_field;
@@ -274,53 +458,71 @@ void activate(GtkApplication *app, gpointer user_data) {
 	//Declaring buttons
 	GtkAdjustment *noise_spin_button_adjustment;
 	GtkAdjustment *band_spin_button_adjustment;
+	GtkAdjustment *error_prob_spin_button_adjustment;
 	GtkWidget *noise_spin_button;
 	GtkWidget *band_spin_button;
+	GtkWidget *error_prob_spin_button;
 	GtkWidget *send_button;
-	GtkWidget *check_box[9];
+	GtkWidget *check_box[15];
 
 	//Declaring text field's and spin button's label
 	GtkWidget *text_field_label;
 	GtkWidget *spin_button_label_horizontal;
 	GtkWidget *spin_button_label_vertical;
 	GtkWidget *band_spin_button_label;
+	GtkWidget *error_prob_spin_button_label;
 
 	//Declaring check box row's label
 	GtkWidget *check_box_digital_label;
 	GtkWidget *check_box_carrier_label;
+	GtkWidget *check_box_error_detection_label;
+	GtkWidget *check_box_frame_label;
 
 	//Declaring check box's label containing digital modulation types
 	GtkWidget *digital_type_label[6];
 	
 	//Declaring check box's label containing carrier modulation types
 	GtkWidget *carrier_type_label[3];
-		
+	
+	//Declaring check box's label conatining frame types
+	GtkWidget *frame_type_label[3];
+
+	//Declaring check box's label conatining frame types
+	GtkWidget *error_detection_type_label[3];
+
 	//Initializing window and its components
 	main_window = gtk_application_window_new(app);
 	
 	noise_spin_button_horizontal_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
 	main_vertical_container = gtk_box_new(GTK_ORIENTATION_VERTICAL, 20);
-	main_check_box_digital_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 30);
-	main_check_box_carrier_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 50);
+	main_check_box_digital_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 35);
+	main_check_box_carrier_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 210);
+	main_check_box_error_detection_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 175);
+	main_check_box_frame_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 170); 
 
 	text_field = gtk_text_view_new();
 	text_field_label = gtk_label_new("Type a message");
 	
-	noise_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0);
-	band_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0); 
+	noise_spin_button_adjustment = gtk_adjustment_new(1000.0, 100.0, 1744.0, 1.0, 0.1, 0.0);
+	band_spin_button_adjustment = gtk_adjustment_new(1000.0, 1.0, 1000000000000.0, 1.0, 0.1, 0.0);
+	error_prob_spin_button_adjustment = gtk_adjustment_new(0.0, 0.0, 100.0, 1.0, 0.1, 0.0);
 	noise_spin_button = gtk_spin_button_new(noise_spin_button_adjustment, 10.0, 3);
 	band_spin_button = gtk_spin_button_new(band_spin_button_adjustment, 10.0, 3);
+	error_prob_spin_button = gtk_spin_button_new(error_prob_spin_button_adjustment, 10.0, 3);
 	
 	send_button = gtk_button_new_with_label("Send message");
 	
 	spin_button_label_horizontal = gtk_label_new("Watt");
 	band_spin_button_label = gtk_label_new("Hz");
-	spin_button_label_vertical = gtk_label_new("Define the channel's noise power and the bandwidth's frequency");
+	error_prob_spin_button_label = gtk_label_new("%");
+	spin_button_label_vertical = gtk_label_new("Define the channel's noise power, the bandwidth's frequency and the error probability");
 	
 	check_box_digital_label = gtk_label_new("Choose one type of digital modulation");
 	check_box_carrier_label = gtk_label_new("Choose one type of carrier modulation");
+	check_box_frame_label = gtk_label_new("Choose one type of framing method");
+	check_box_error_detection_label = gtk_label_new("Choose one type of error detection method");
 
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		vertical_check_box_container[i] = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
 		check_box[i] = gtk_check_button_new();
 	}
@@ -331,6 +533,14 @@ void activate(GtkApplication *app, gpointer user_data) {
 
 	for (int i=0; i<3; i++) {
 		carrier_type_label[i] = gtk_label_new(NULL);
+	}
+
+	for (int i=0; i<3; i++) {
+		frame_type_label[i] = gtk_label_new(NULL);
+	}
+
+	for (int i=0; i<3; i++) {
+		error_detection_type_label[i] = gtk_label_new(NULL);
 	}
 	
 	//Setting the modulation type's label
@@ -345,22 +555,40 @@ void activate(GtkApplication *app, gpointer user_data) {
 	gtk_label_set_label(GTK_LABEL(carrier_type_label[1]), "FSK");
 	gtk_label_set_label(GTK_LABEL(carrier_type_label[2]), "8-QAM");
 
+	gtk_label_set_label(GTK_LABEL(frame_type_label[0]), "Char count");
+	gtk_label_set_label(GTK_LABEL(frame_type_label[1]), "Bytes flag");
+	gtk_label_set_label(GTK_LABEL(frame_type_label[2]), "Bits flag");
+
+	gtk_label_set_label(GTK_LABEL(error_detection_type_label[0]), "Parity bit");
+	gtk_label_set_label(GTK_LABEL(error_detection_type_label[1]), "CRC");
+	gtk_label_set_label(GTK_LABEL(error_detection_type_label[2]), "Hamming code");
+
 	//Appending components to their respective containers
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		if (i<6) {
 			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), check_box[i]);
 			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), digital_type_label[i]);
-		}else{
+		}else if (i<9){
 			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), check_box[i]);
 			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), carrier_type_label[i-6]);
+		}else if (i<12){
+			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), check_box[i]);
+			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), frame_type_label[i-9]);
+		}else{
+			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), check_box[i]);
+			gtk_box_append(GTK_BOX(vertical_check_box_container[i]), error_detection_type_label[i-12]);
 		}
 	}
 	
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		if (i<6) {
 			gtk_box_append(GTK_BOX(main_check_box_digital_container), vertical_check_box_container[i]);
-		}else{
+		}else if (i<9){
 			gtk_box_append(GTK_BOX(main_check_box_carrier_container), vertical_check_box_container[i]);
+		}else if (i<12){
+			gtk_box_append(GTK_BOX(main_check_box_frame_container), vertical_check_box_container[i]);
+		}else{
+			gtk_box_append(GTK_BOX(main_check_box_error_detection_container), vertical_check_box_container[i]);
 		}
 	}
 
@@ -368,6 +596,8 @@ void activate(GtkApplication *app, gpointer user_data) {
 	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), spin_button_label_horizontal);
 	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), band_spin_button);
 	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), band_spin_button_label);
+	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), error_prob_spin_button);
+	gtk_box_append(GTK_BOX(noise_spin_button_horizontal_container), error_prob_spin_button_label);
 
 	gtk_box_append(GTK_BOX(main_vertical_container), text_field_label);
 	gtk_box_append(GTK_BOX(main_vertical_container), text_field);
@@ -377,14 +607,23 @@ void activate(GtkApplication *app, gpointer user_data) {
 	gtk_box_append(GTK_BOX(main_vertical_container), main_check_box_digital_container);
 	gtk_box_append(GTK_BOX(main_vertical_container), check_box_carrier_label);
 	gtk_box_append(GTK_BOX(main_vertical_container), main_check_box_carrier_container);
+	gtk_box_append(GTK_BOX(main_vertical_container), check_box_frame_label);		
+	gtk_box_append(GTK_BOX(main_vertical_container), main_check_box_frame_container);
+	gtk_box_append(GTK_BOX(main_vertical_container), check_box_error_detection_label);
+	gtk_box_append(GTK_BOX(main_vertical_container), main_check_box_error_detection_container);
 	gtk_box_append(GTK_BOX(main_vertical_container), send_button);
+		
 	
 	//Setting check button's group
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		if (i<6 && i!=0) {
 			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[0]));
-		}else if (i>6) {
+		}else if (i>6 && i<9) {
 			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[6]));
+		}else if (i>9 && i<12) {
+			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[9]));
+		}else if (i>12) {
+			gtk_check_button_set_group(GTK_CHECK_BUTTON(check_box[i]), GTK_CHECK_BUTTON(check_box[12]));
 		}
 	}
 
@@ -394,12 +633,13 @@ void activate(GtkApplication *app, gpointer user_data) {
 
 	data->text_field = text_field;
 
-	for (int i=0; i<9; i++) {
+	for (int i=0; i<15; i++) {
 		data->check_button[i] = check_box[i];
 	}
 
 	data->noise_spin_button = noise_spin_button;
 	data->band_spin_button = band_spin_button;
+	data->error_prob_spin_button = error_prob_spin_button;
 
 	g_signal_connect(send_button, "clicked", G_CALLBACK(sendButtonClick), data); 	
 
