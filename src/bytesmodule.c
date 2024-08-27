@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
@@ -298,13 +299,15 @@ unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int rece
 	}
 
 	//CRC division algorithm
-	for (int i=0; i<received_data_bits_length + 31; i += 32) {
+	for (int i=0; i<received_data_bits_length + 31; i++) {
 		
-		int crc_word_index = 0;
-		for (int k=i; k<i+32; k++) {
-			result_word[k] = crc_word[crc_word_index] ^ result_word[k];
-			crc_word_index += 1;
-		}	
+		if (result_word[i] != 0 && (received_data_bits_length + 31) - i > 31) {
+			int crc_word_index = 0;
+			for (int k=i; k<i+32; k++) {
+				result_word[k] = crc_word[crc_word_index] ^ result_word[k];
+				crc_word_index += 1;
+			}
+		}
 	}
 	
 	//Storing message with key
@@ -313,4 +316,370 @@ unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int rece
 	}
 
 	return result_word;
+}
+
+unsigned char* generateHammingErrorCorrection(unsigned char* received_data_bits, int received_data_bits_length) {
+	unsigned char *result_message = (unsigned char*) malloc(received_data_bits_length);
+	
+	int parity = 1;
+	int exponent = 0;
+	int parity_bits_num = 0;
+	int iter = 0;
+	int message_index = 0;
+
+	//Add parity bits to the message
+	while (iter<received_data_bits_length) {
+		if (iter == parity-1) {
+			parity_bits_num += 1;
+			result_message = (unsigned char*) realloc(result_message, received_data_bits_length + parity_bits_num);
+
+			result_message[iter] = 0;
+
+			exponent += 1;
+			parity = (int) pow(2.0, (double) exponent);
+		}
+		
+		iter += 1;
+	}
+	
+	exponent = 0;
+	parity = 1;
+	iter = 0;
+	while (iter < received_data_bits_length + parity_bits_num) {
+		if (iter != parity-1) {
+			result_message[iter] = received_data_bits[message_index];
+			message_index += 1;
+		}else{
+			exponent += 1;
+			parity = (int) pow(2.0, (double) exponent);
+		}
+
+		iter += 1;
+	}
+	
+	//Assigning the correct value to the parity bits
+	parity = 1;
+	exponent = 0;
+	iter = 0;
+	int parity_bit_sum = 0;
+
+	while (parity < received_data_bits_length) {
+		iter = parity - 1;
+		
+		while (iter < received_data_bits_length + parity_bits_num) {
+			for (int i=0; i<parity; i++) {
+				if (iter < received_data_bits_length + parity_bits_num) {
+					parity_bit_sum += result_message[iter];
+					iter += 1;
+				}
+			}
+
+			iter += parity;
+		}
+		
+		if (parity_bit_sum % 2 == 0) {
+			result_message[parity-1] = 0;
+		}else{
+			result_message[parity-1] = 1;
+		}
+
+		exponent += 1;
+		parity = (int) pow(2.0, (double) exponent);
+
+		parity_bit_sum = 0;
+	}
+		
+	return result_message;	
+}
+
+unsigned char* getMessageFromByteFrame(unsigned char* received_message, int message_length) {
+	unsigned char* raw_message = (unsigned char*) malloc(message_length);
+	unsigned char flag_char = 126;
+	unsigned char esc_char = 124;
+	int raw_message_index = 0;
+	bool isEscActive = false;
+	bool nextIsStartFlag = true;
+	bool errorInFlag = false;
+
+	//Remove the flags
+	for (int i=0; i<message_length; i++) {
+		if (received_message[i] == esc_char) {
+			isEscActive = true;
+		}
+		
+		if ((nextIsStartFlag && received_message[i] != flag_char) || (i == message_length - 1 && received_message[i] != flag_char)) {
+			errorInFlag = true;
+		}else if (received_message[i] == flag_char && isEscActive) {
+			isEscActive = false;
+		}else if (received_message[i] == flag_char) {
+			nextIsStartFlag = !nextIsStartFlag;		
+		}else{
+			raw_message[raw_message_index] = received_message[i];
+			raw_message_index += 1;
+			isEscActive = false;
+		}
+	}
+
+	//Verifies if there are errors on the flags
+	if (errorInFlag) {
+		return NULL;
+	}
+
+	return raw_message;
+}
+
+unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int message_length) {
+	unsigned char* raw_message = (unsigned char*) malloc(message_length);
+	int one_counter = 0;
+	int byte_index = 0;
+	int raw_message_index = 0;
+	bool isFlag = false;
+	bool nextIsStartFlag = true;
+	bool removeZero = false;
+	bool flagHasError = false;
+
+	unsigned char byte[8] = {0};
+		
+
+	for (int i=0; i<message_length; i++) {
+		
+		if (received_message_bits[i]) {
+			one_counter += 1;
+			
+			byte[byte_index] = received_message_bits[i];
+			byte_index += 1;
+		}else{	
+			
+			if (one_counter == 5) {
+				removeZero = true;
+				isFlag = false;
+			}else if (one_counter == 6) {
+				isFlag = true;	
+			}
+
+			if (!removeZero) {
+				byte[byte_index] = received_message_bits[i];
+				byte_index += 1;
+			}
+			
+			removeZero = false;
+			one_counter = 0;
+		}
+
+		if (byte_index == 8) {
+			if ((nextIsStartFlag && !isFlag) || (i == message_length - 1 && !isFlag)) {
+				flagHasError = true;
+			}
+			
+			if (!isFlag) {
+				for (int k=0; k<8; k++) {
+					raw_message[raw_message_index] = byte[k];
+					raw_message_index += 1;	
+				}
+			}else{
+				nextIsStartFlag = !nextIsStartFlag;	
+			}
+			
+			isFlag = false;
+			byte_index = 0;
+		}
+	}
+
+	if (flagHasError) {
+		return NULL;
+	}
+
+	return raw_message;
+}
+
+unsigned char* verifyErrorByParity(unsigned char* received_message_bits, int message_length) {
+	unsigned char* raw_message = (unsigned char*) malloc(message_length - 1);
+	int one_count = 0;
+	int parity_bit = 0;
+	
+	//Counts the number of 1's 
+	for (int i=0; i<message_length; i++) {
+		if (i == message_length - 1) {
+			parity_bit = received_message_bits[i];
+			break;
+		}
+		
+		if (received_message_bits[i]) {
+			one_count += 1;
+		}
+
+		raw_message[i] = received_message_bits[i];
+	}
+	
+	//Verifies if parity bit is correct
+	if (one_count % 2 == 0 && parity_bit != 0) {
+		return NULL;
+	}else if (one_count % 2 != 0 && parity_bit != 1){
+		return NULL;
+	}
+
+	return raw_message;
+}
+
+unsigned char* verifyErrorByCrc(unsigned char* received_message_bits, int message_length) {
+	unsigned char crc_word[] = {1,1,1,0,1,1,0,1,1,0,1,1,1,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0};
+	unsigned char *result_word = (unsigned char*) malloc(message_length);
+	unsigned char *raw_message = (unsigned char*) malloc(message_length - 31);
+	bool hasError = false;
+	
+	//Copying message
+	for (int i=0; i<message_length; i++) {
+		result_word[i] = received_message_bits[i];
+
+		if (i < message_length-31) {
+			raw_message[i] = received_message_bits[i];
+		}
+	}
+
+	//CRC division algorithm
+	for (int i=0; i<message_length; i++) {
+		
+		if (result_word[i] != 0 && (message_length) - i > 31) {
+			int crc_word_index = 0;
+			for (int k=i; k<i+32; k++) {
+				result_word[k] = crc_word[crc_word_index] ^ result_word[k];
+				crc_word_index += 1;
+			}
+		}
+	}
+
+	//Verifies if result is equals zero
+	for (int i=0; i<message_length; i++) {
+		if (result_word[i]) {
+			hasError = true;
+		}
+	}
+
+	if (hasError) {
+		return NULL;
+	}
+
+	return raw_message;
+}
+
+unsigned char* verifyErrorByHamming(unsigned char* received_message_bits, int message_size) {
+	unsigned char* raw_message = (unsigned char*) malloc(message_size);
+	int* incorrect_parity = (int*) malloc(sizeof(int));
+	int* index_of_possible_error = (int*) malloc(sizeof(int));
+	int* ones_array = (int*) malloc(sizeof(int));
+	int* ones_array2 = (int*) malloc(sizeof(int));
+	incorrect_parity[0] = -1;
+	
+	int parity_for_check = 1;
+	int check_exponent = 0;
+	int parity = 1;
+	int message_index = 0;
+	int bit_sum = 0;
+	int exponent = 0;
+	int incorrect_parity_index = 0;
+
+	while (parity < message_size) {
+		message_index = parity - 1;
+		
+		while (message_index < message_size) {
+			for (int i=0; i<parity; i++) {
+				while (parity_for_check - 1 < message_index) {
+					check_exponent += 1;
+					parity_for_check = (int) pow(2.0, (double) check_exponent);
+				}
+				
+				if (message_index != parity_for_check - 1 && message_index < message_size) {
+					bit_sum += received_message_bits[message_index];
+				}
+
+				message_index += 1;
+			}
+
+			message_index += parity;
+		}
+
+		//Verifies if the sum is correct
+		if ((bit_sum % 2 == 0 && received_message_bits[parity-1] != 0) || (bit_sum % 2 != 0 && received_message_bits[parity-1] == 0)) {
+			incorrect_parity[incorrect_parity_index] = parity;
+			incorrect_parity_index += 1;
+
+			incorrect_parity = (int*) realloc(incorrect_parity, sizeof(int)*(incorrect_parity_index+1));
+		}
+
+		bit_sum = 0;
+		exponent += 1;
+		parity = (int) pow(2.0, (double) exponent);
+		check_exponent = 0;
+		parity_for_check = 1;
+	}
+	
+	//If there is an error, it tries to correct it
+	int ones_array_index = 0;
+	int ones_array_index2 = 0;
+	int result = 0;
+	int result2 = 0;
+	if (incorrect_parity[0] != -1) {
+		for (int i=0; i<message_size; i++) {
+			if (received_message_bits[i]) {
+				ones_array[ones_array_index] = i+1;
+				ones_array_index += 1;
+
+				ones_array = (int*) realloc(ones_array, sizeof(int)*(ones_array_index + 1));
+			}
+		}
+		
+		result = ones_array[0];
+		for (int i=1; i<ones_array_index; i++) {
+			result = result ^ ones_array[i];
+		}
+		
+		if (result != 0) {
+			if (received_message_bits[result - 1]) {
+				received_message_bits[result - 1] = 0;
+			}else{
+				received_message_bits[result - 1] = 1;
+			}
+
+			//Check if error was corrected
+			for (int i=0; i<message_size; i++) {
+				if (received_message_bits[i]) {
+					ones_array2[ones_array_index2] = i+1;
+					ones_array_index2 += 1;
+
+					ones_array2 = (int*) realloc(ones_array2, sizeof(int)*(ones_array_index2 + 1));
+				}
+			}
+		
+			result2 = ones_array2[0];
+			for (int i=1; i<ones_array_index2; i++) {
+				result2 = result2 ^ ones_array2[i];
+			}
+
+			if (result2 != 0) {
+				return NULL;
+			}
+		}
+	}
+
+	//Removing parity bits to return the raw message
+	parity = 1;
+	exponent = 0;
+	message_index = 0;
+	
+	for (int i=0; i<message_size; i++) {
+		if (i+1 == parity) {
+			exponent += 1;
+			parity = (int) pow(2.0, (double) exponent);
+		}else{		
+			raw_message[message_index] = received_message_bits[i];
+			message_index += 1;
+		}
+	}
+
+	free(incorrect_parity);
+	free(index_of_possible_error);
+	free(ones_array);
+	free(ones_array2);
+	
+	return raw_message;
 }
