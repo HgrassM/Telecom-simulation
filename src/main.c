@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gtk/gtk.h>
+#include <pthread.h>
 
-#include "gtkmodule.c"
+#include "header/gtkmodule.h"
 
 int main(int argc, char *argv[]) {
 	GtkApplication *app;
@@ -14,5 +15,5 @@ int main(int argc, char *argv[]) {
 	g_object_unref(app);
 
 
-	return status;
+	pthread_exit(NULL);
 }
