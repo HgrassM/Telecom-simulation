@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <math.h>
+#include <gtk/gtk.h>
 
 #include "header/bytesmodule.h"
 
@@ -23,8 +24,12 @@ unsigned char* convertToBitStream(unsigned char message[], int message_size) {
 }
 
 //This function turns an array of bits into a byte array
-unsigned char* convertToByteStream(unsigned char* message_bits, int message_bits_size) {
+ResultWithSize convertToByteStream(unsigned char* message_bits, int message_bits_size) {
 	unsigned char *message_bytes = (unsigned char*) malloc(message_bits_size/8);
+	
+	for (int i=0; i<message_bits_size/8; i++) {
+		message_bytes[i] = 0;
+	}
 	
 	int byte_index = 0;
 
@@ -42,8 +47,15 @@ unsigned char* convertToByteStream(unsigned char* message_bits, int message_bits
 			message_bytes[byte_index] |= 1 << (i%8);
 		}	
 	}
-
-	return message_bytes;
+	
+	message_bytes[byte_index] = (message_bytes[byte_index] & 0xF0) >> 4 | (message_bytes[byte_index] & 0x0F) << 4;
+	message_bytes[byte_index] = (message_bytes[byte_index] & 0xCC) >> 2 | (message_bytes[byte_index] & 0x33) << 2;
+	message_bytes[byte_index] = (message_bytes[byte_index] & 0xAA) >> 1 | (message_bytes[byte_index] & 0x55) << 1;
+	
+	
+	ResultWithSize result = {message_bytes, (message_bits_size/8)};
+	
+	return result;	
 }
 
 //This function generates an error per bit based on the given probability
@@ -72,11 +84,12 @@ void generateError(unsigned char* message_bits, int message_bits_size, int error
 	}
 }
 
-unsigned char* frameByCharacterCounting(unsigned char* raw_message, int raw_message_size) {
+ResultWithSize frameByCharacterCounting(unsigned char* raw_message, int raw_message_size) {
 	unsigned char *frames;
 	int extra_byte = 0;
 	//Generate a single frame for a message smaller than 8 bytes
 	if (raw_message_size < 8) {
+		extra_byte += 1;
 		frames = (unsigned char*) malloc(raw_message_size + 1);
 
 		frames[0] = raw_message_size + 1;
@@ -122,10 +135,12 @@ unsigned char* frameByCharacterCounting(unsigned char* raw_message, int raw_mess
 		}
 	}
 
-	return frames;	
+	ResultWithSize result = {frames, raw_message_size + extra_byte};
+	
+	return result;	
 }
 
-unsigned char* frameByBytesFlag(unsigned char* raw_message, int raw_message_size) {
+ResultWithSize frameByBytesFlag(unsigned char* raw_message, int raw_message_size) {
 	unsigned char flag_char = 126;
 	unsigned char esc_char = 124;
 	unsigned char *frames = (unsigned char*) malloc(raw_message_size);
@@ -171,10 +186,12 @@ unsigned char* frameByBytesFlag(unsigned char* raw_message, int raw_message_size
 
 	frames[frames_index] = flag_char;	
 
-	return frames;
+	ResultWithSize result = {frames, raw_message_size + extra_byte};
+	
+	return result;
 }
 
-unsigned char* frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_bits_size) {
+ResultWithSize frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_bits_size) {
 	unsigned char *frames = (unsigned char*) malloc(raw_message_bits_size);
 	
 	int frames_index = 0;
@@ -260,10 +277,12 @@ unsigned char* frameByBitsFlag(unsigned char* raw_message_bits, int raw_message_
 		}
 	}
 
-	return frames;
+	ResultWithSize result = {frames, raw_message_bits_size + extra_bits};
+	
+	return result;
 }
 
-unsigned char* createErrorCheckBitParity(unsigned char* received_data_bits, int received_data_bits_length) {
+ResultWithSize createErrorCheckBitParity(unsigned char* received_data_bits, int received_data_bits_length) {
 	unsigned char *message_with_parity_bit = (unsigned char*) malloc(received_data_bits_length + 1);
 	int one_count = 0;
 
@@ -281,10 +300,12 @@ unsigned char* createErrorCheckBitParity(unsigned char* received_data_bits, int 
 		message_with_parity_bit[received_data_bits_length] = 0;	
 	}
 
-	return message_with_parity_bit;
+	ResultWithSize result = {message_with_parity_bit, received_data_bits_length + 1};
+	
+	return result;
 }
 
-unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int received_data_bits_length) {
+ResultWithSize generateCrcErrorCheck(unsigned char* received_data_bits, int received_data_bits_length) {
 	unsigned char crc_word[] = {1,1,1,0,1,1,0,1,1,0,1,1,1,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0};
 	unsigned char *result_word = (unsigned char*) malloc(received_data_bits_length + 31);
 
@@ -315,10 +336,12 @@ unsigned char* generateCrcErrorCheck(unsigned char* received_data_bits, int rece
 		result_word[i] = received_data_bits[i];
 	}
 
-	return result_word;
+	ResultWithSize result = {result_word, received_data_bits_length + 31};
+	
+	return result;
 }
 
-unsigned char* generateHammingErrorCorrection(unsigned char* received_data_bits, int received_data_bits_length) {
+ResultWithSize generateHammingErrorCorrection(unsigned char* received_data_bits, int received_data_bits_length) {
 	unsigned char *result_message = (unsigned char*) malloc(received_data_bits_length);
 	
 	int parity = 1;
@@ -389,10 +412,47 @@ unsigned char* generateHammingErrorCorrection(unsigned char* received_data_bits,
 		parity_bit_sum = 0;
 	}
 		
-	return result_message;	
+	ResultWithSize result = {result_message, received_data_bits_length + parity_bits_num};
+	
+	return result;	
 }
 
-unsigned char* getMessageFromByteFrame(unsigned char* received_message, int message_length) {
+ResultWithSize getMessageFromCharacterFrame(unsigned char* received_message, int message_length) {
+	unsigned char* result_message = (unsigned char*) malloc(message_length);
+
+	int frame_byte_num = (int)received_message[0];
+	int received_message_index = 0;
+	int result_message_index = 0;
+	int extra_bytes = 0;
+	
+	//Gets N bytes based on the character counting byte value
+	while (received_message_index < message_length) {
+		extra_bytes += 1;
+		
+		for (int i=0; i<frame_byte_num; i++) {
+			if (received_message_index >= message_length) {
+				free(result_message);
+				ResultWithSize result = {NULL, 0};
+				return result;
+			} 
+			
+			if (i != 0) {
+				result_message[result_message_index] = received_message[received_message_index];
+				result_message_index += 1;
+			}
+			
+			received_message_index += 1;
+		}
+		
+		frame_byte_num = (int)received_message[received_message_index];
+	}
+	
+	ResultWithSize result = {result_message, message_length - extra_bytes};
+	
+	return result;
+}
+
+ResultWithSize getMessageFromByteFrame(unsigned char* received_message, int message_length) {
 	unsigned char* raw_message = (unsigned char*) malloc(message_length);
 	unsigned char flag_char = 126;
 	unsigned char esc_char = 124;
@@ -400,11 +460,14 @@ unsigned char* getMessageFromByteFrame(unsigned char* received_message, int mess
 	bool isEscActive = false;
 	bool nextIsStartFlag = true;
 	bool errorInFlag = false;
+	
+	int extra_bytes = 0;
 
 	//Remove the flags
 	for (int i=0; i<message_length; i++) {
 		if (received_message[i] == esc_char) {
 			isEscActive = true;
+			extra_bytes += 1;
 		}
 		
 		if ((nextIsStartFlag && received_message[i] != flag_char) || (i == message_length - 1 && received_message[i] != flag_char)) {
@@ -412,7 +475,8 @@ unsigned char* getMessageFromByteFrame(unsigned char* received_message, int mess
 		}else if (received_message[i] == flag_char && isEscActive) {
 			isEscActive = false;
 		}else if (received_message[i] == flag_char) {
-			nextIsStartFlag = !nextIsStartFlag;		
+			nextIsStartFlag = !nextIsStartFlag;
+			extra_bytes += 1;		
 		}else{
 			raw_message[raw_message_index] = received_message[i];
 			raw_message_index += 1;
@@ -422,13 +486,17 @@ unsigned char* getMessageFromByteFrame(unsigned char* received_message, int mess
 
 	//Verifies if there are errors on the flags
 	if (errorInFlag) {
-		return NULL;
+		free(raw_message);
+		ResultWithSize result = {NULL, 0};
+		return result;
 	}
 
-	return raw_message;
+	ResultWithSize result = {raw_message, message_length - extra_bytes};
+	
+	return result;
 }
 
-unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int message_length) {
+ResultWithSize getMessageFromBitFrame(unsigned char* received_message_bits, int message_length) {
 	unsigned char* raw_message = (unsigned char*) malloc(message_length);
 	int one_counter = 0;
 	int byte_index = 0;
@@ -437,6 +505,8 @@ unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int 
 	bool nextIsStartFlag = true;
 	bool removeZero = false;
 	bool flagHasError = false;
+	
+	int extra_bits = 0;
 
 	unsigned char byte[8] = {0};
 		
@@ -453,6 +523,7 @@ unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int 
 			if (one_counter == 5) {
 				removeZero = true;
 				isFlag = false;
+				extra_bits += 1;
 			}else if (one_counter == 6) {
 				isFlag = true;	
 			}
@@ -477,7 +548,8 @@ unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int 
 					raw_message_index += 1;	
 				}
 			}else{
-				nextIsStartFlag = !nextIsStartFlag;	
+				nextIsStartFlag = !nextIsStartFlag;
+				extra_bits += 8;	
 			}
 			
 			isFlag = false;
@@ -486,13 +558,17 @@ unsigned char* getMessageFromBitFrame(unsigned char* received_message_bits, int 
 	}
 
 	if (flagHasError) {
-		return NULL;
+		free(raw_message);
+		ResultWithSize result = {NULL, 0};
+		return result;
 	}
 
-	return raw_message;
+	ResultWithSize result = {raw_message, message_length - extra_bits};
+	
+	return result;
 }
 
-unsigned char* verifyErrorByParity(unsigned char* received_message_bits, int message_length) {
+ResultWithSize verifyErrorByParity(unsigned char* received_message_bits, int message_length) {
 	unsigned char* raw_message = (unsigned char*) malloc(message_length - 1);
 	int one_count = 0;
 	int parity_bit = 0;
@@ -513,15 +589,21 @@ unsigned char* verifyErrorByParity(unsigned char* received_message_bits, int mes
 	
 	//Verifies if parity bit is correct
 	if (one_count % 2 == 0 && parity_bit != 0) {
-		return NULL;
+		free(raw_message);
+		ResultWithSize result = {NULL, 0};
+		return result;
 	}else if (one_count % 2 != 0 && parity_bit != 1){
-		return NULL;
+		free(raw_message);
+		ResultWithSize result = {NULL, 0};
+		return result;
 	}
 
-	return raw_message;
+	ResultWithSize result = {raw_message, message_length - 1};
+	
+	return result;
 }
 
-unsigned char* verifyErrorByCrc(unsigned char* received_message_bits, int message_length) {
+ResultWithSize verifyErrorByCrc(unsigned char* received_message_bits, int message_length) {
 	unsigned char crc_word[] = {1,1,1,0,1,1,0,1,1,0,1,1,1,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0};
 	unsigned char *result_word = (unsigned char*) malloc(message_length);
 	unsigned char *raw_message = (unsigned char*) malloc(message_length - 31);
@@ -556,130 +638,97 @@ unsigned char* verifyErrorByCrc(unsigned char* received_message_bits, int messag
 	}
 
 	if (hasError) {
-		return NULL;
+		free(result_word);
+		free(raw_message);
+		ResultWithSize result = {NULL, 0};
+		return result;
 	}
-
-	return raw_message;
+	
+	free(result_word);
+	ResultWithSize result = {raw_message, message_length - 31};
+	
+	return result;
 }
 
-unsigned char* verifyErrorByHamming(unsigned char* received_message_bits, int message_size) {
+ResultWithSize verifyErrorByHamming(unsigned char* received_message_bits, int message_size) {
 	unsigned char* raw_message = (unsigned char*) malloc(message_size);
-	int* incorrect_parity = (int*) malloc(sizeof(int));
-	int* index_of_possible_error = (int*) malloc(sizeof(int));
 	int* ones_array = (int*) malloc(sizeof(int));
 	int* ones_array2 = (int*) malloc(sizeof(int));
-	incorrect_parity[0] = -1;
-	
-	int parity_for_check = 1;
-	int check_exponent = 0;
-	int parity = 1;
-	int message_index = 0;
-	int bit_sum = 0;
-	int exponent = 0;
-	int incorrect_parity_index = 0;
-
-	while (parity < message_size) {
-		message_index = parity - 1;
-		
-		while (message_index < message_size) {
-			for (int i=0; i<parity; i++) {
-				while (parity_for_check - 1 < message_index) {
-					check_exponent += 1;
-					parity_for_check = (int) pow(2.0, (double) check_exponent);
-				}
-				
-				if (message_index != parity_for_check - 1 && message_index < message_size) {
-					bit_sum += received_message_bits[message_index];
-				}
-
-				message_index += 1;
-			}
-
-			message_index += parity;
-		}
-
-		//Verifies if the sum is correct
-		if ((bit_sum % 2 == 0 && received_message_bits[parity-1] != 0) || (bit_sum % 2 != 0 && received_message_bits[parity-1] == 0)) {
-			incorrect_parity[incorrect_parity_index] = parity;
-			incorrect_parity_index += 1;
-
-			incorrect_parity = (int*) realloc(incorrect_parity, sizeof(int)*(incorrect_parity_index+1));
-		}
-
-		bit_sum = 0;
-		exponent += 1;
-		parity = (int) pow(2.0, (double) exponent);
-		check_exponent = 0;
-		parity_for_check = 1;
-	}
 	
 	//If there is an error, it tries to correct it
 	int ones_array_index = 0;
 	int ones_array_index2 = 0;
 	int result = 0;
 	int result2 = 0;
-	if (incorrect_parity[0] != -1) {
+
+	for (int i=0; i<message_size; i++) {
+		if (received_message_bits[i]) {
+			ones_array[ones_array_index] = i+1;
+			ones_array_index += 1;
+
+			ones_array = (int*) realloc(ones_array, sizeof(int)*(ones_array_index + 1));
+		}
+	}
+	
+	result = ones_array[0];
+	for (int i=1; i<ones_array_index; i++) {
+		result = result ^ ones_array[i];
+	}
+	
+	if (result != 0) {
+		if (received_message_bits[result - 1]) {
+			received_message_bits[result - 1] = 0;
+		}else{
+			received_message_bits[result - 1] = 1;
+		}
+
+		//Check if error was corrected
 		for (int i=0; i<message_size; i++) {
 			if (received_message_bits[i]) {
-				ones_array[ones_array_index] = i+1;
-				ones_array_index += 1;
+				ones_array2[ones_array_index2] = i+1;
+				ones_array_index2 += 1;
 
-				ones_array = (int*) realloc(ones_array, sizeof(int)*(ones_array_index + 1));
+				ones_array2 = (int*) realloc(ones_array2, sizeof(int)*(ones_array_index2 + 1));
 			}
 		}
-		
-		result = ones_array[0];
-		for (int i=1; i<ones_array_index; i++) {
-			result = result ^ ones_array[i];
+	
+		result2 = ones_array2[0];
+		for (int i=1; i<ones_array_index2; i++) {
+			result2 = result2 ^ ones_array2[i];
 		}
-		
-		if (result != 0) {
-			if (received_message_bits[result - 1]) {
-				received_message_bits[result - 1] = 0;
-			}else{
-				received_message_bits[result - 1] = 1;
-			}
 
-			//Check if error was corrected
-			for (int i=0; i<message_size; i++) {
-				if (received_message_bits[i]) {
-					ones_array2[ones_array_index2] = i+1;
-					ones_array_index2 += 1;
-
-					ones_array2 = (int*) realloc(ones_array2, sizeof(int)*(ones_array_index2 + 1));
-				}
-			}
-		
-			result2 = ones_array2[0];
-			for (int i=1; i<ones_array_index2; i++) {
-				result2 = result2 ^ ones_array2[i];
-			}
-
-			if (result2 != 0) {
-				return NULL;
-			}
+		if (result2 != 0) {
+			free(ones_array);
+			free(ones_array2);
+			free(raw_message);
+			ResultWithSize result = {NULL, 0};
+			return result;
 		}
 	}
 
 	//Removing parity bits to return the raw message
-	parity = 1;
-	exponent = 0;
-	message_index = 0;
+	int parity = 1;
+	int message_index = 0;
+	int exponent = 0;
+	
+	int extra_bits = 0;
 	
 	for (int i=0; i<message_size; i++) {
 		if (i+1 == parity) {
 			exponent += 1;
 			parity = (int) pow(2.0, (double) exponent);
+			
+			extra_bits += 1;
 		}else{		
 			raw_message[message_index] = received_message_bits[i];
 			message_index += 1;
 		}
 	}
 
-	free(incorrect_parity);
-	free(index_of_possible_error);
 	free(ones_array);
 	free(ones_array2);
 	
-	return raw_message;
+	ResultWithSize result_m = {raw_message, message_size - extra_bits};
+	
+	return result_m;
 }
