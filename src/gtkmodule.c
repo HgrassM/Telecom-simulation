@@ -139,13 +139,18 @@ void* receptor_execution(void* gtk_data) {
 			free(encoded_message_bytes.result_message);
 			free(message_with_frames.result_message);	
 		}else{
+			raw_message.result_message = NULL;
+			raw_message.result_message_length = 0;
 			gtk_label_set_text(GTK_LABEL(label_decoded_message), "  ");
 			gtk_label_set_text(GTK_LABEL(label_warning_1), "An unfixable error has been detected");
 		}
 		
-		if (!isByte) {
+		if (!isByte && raw_message_bits.result_message != NULL) {
 			raw_message = convertToByteStream(raw_message_bits.result_message, raw_message_bits.result_message_length);
 			free(raw_message_bits.result_message);
+		}else if (!isByte && raw_message_bits.result_message == NULL) {
+			raw_message.result_message = NULL;
+			raw_message.result_message_length = 0;
 		}
 
 		if (raw_message.result_message != NULL) {
